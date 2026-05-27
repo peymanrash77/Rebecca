@@ -520,6 +520,32 @@ def process_inbounds_and_tags(
                 if proxy_key_str == protocol:
                     service_inbounds[proxy_key].append(tag)
         inbounds = service_inbounds
+    elif not inbounds:
+        excluded_data = (extra_data or {}).get("excluded_inbounds") or {}
+        has_explicit_exclusions = any(bool(tags) for tags in excluded_data.values())
+        if not has_explicit_exclusions:
+            if not _host_map_has_hosts(host_map):
+                try:
+                    fallback_host_map = _load_host_map_from_db(set(inbounds_by_tag.keys()))
+                    if _host_map_has_hosts(fallback_host_map):
+                        host_map = fallback_host_map
+                except Exception:
+                    pass
+
+            allowed_tags = {tag for tag, hosts in (host_map or {}).items() if hosts}
+            no_service_inbounds: dict = {proxy_key: [] for proxy_key in proxies.keys()}
+            for tag in allowed_tags:
+                inbound = inbounds_by_tag.get(tag)
+                if not inbound:
+                    continue
+                protocol = inbound.get("protocol")
+                if not protocol:
+                    continue
+                for proxy_key in proxies.keys():
+                    proxy_key_str = proxy_key.value if hasattr(proxy_key, "value") else str(proxy_key)
+                    if proxy_key_str == protocol:
+                        no_service_inbounds[proxy_key].append(tag)
+            inbounds = no_service_inbounds
 
     host_entries = []
     for protocol, tags in inbounds.items():
