@@ -608,7 +608,13 @@ class ReSTXRayNode:
         self._set_health_cache(True, bool(version_res.get("started", False)))
 
     def disconnect(self):
-        self.make_request("/disconnect", timeout=60)
+        if not self._session_id:
+            self._api = None
+            self._started = False
+            self._set_health_cache(False, False)
+            return
+
+        self.make_request("/disconnect", timeout=60, report_runtime_error=False)
         self._session_id = None
         self._api = None
         self._started = False
